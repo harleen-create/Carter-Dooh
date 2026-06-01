@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(npm create *)",
+      "Bash(mv carter-dooh-temp/* carter-dooh-temp/.* .)",
+      "Bash(rmdir carter-dooh-temp *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)"
+    ]
+  }
+}
