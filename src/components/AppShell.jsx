@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   Search,
   Bell,
@@ -13,6 +14,8 @@ import {
   Wallet,
   Settings,
   Box,
+  PlusCircle,
+  X,
 } from 'lucide-react';
 
 export const NAVY = '#12297D';
@@ -120,6 +123,117 @@ export function Sidebar() {
       </div>
     </aside>
   );
+}
+
+export function FilterDropdown({ id, label, options, selected, onChange, openId, onOpenChange }) {
+  const open = openId === id;
+  const hasSelection = selected.length > 0;
+
+  const toggle = (value) => {
+    if (selected.includes(value)) onChange(selected.filter((v) => v !== value));
+    else onChange([...selected, value]);
+  };
+
+  const summary =
+    selected.length === 1
+      ? selected[0]
+      : selected.length > 1
+      ? `${selected.length} selected`
+      : '';
+
+  return (
+    <div className="relative inline-block" data-filter-pop>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenChange(open ? null : id);
+        }}
+        className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border transition ${
+          hasSelection
+            ? 'bg-blue-50 border-[#12297D]/30 text-[#12297D]'
+            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+        }`}
+      >
+        {hasSelection ? (
+          <>
+            <span className="font-medium">{label}:</span>
+            <span className="font-medium">{summary}</span>
+            <span
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange([]);
+              }}
+              className="ml-1 -mr-1 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-[#12297D]/15"
+            >
+              <X size={11} />
+            </span>
+          </>
+        ) : (
+          <>
+            <PlusCircle size={14} className="text-gray-400" />
+            {label}
+          </>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute z-40 mt-1.5 left-0 bg-white border border-gray-200 rounded-lg shadow-xl w-52 py-1.5">
+          <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
+            Filter by {label}
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {options.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-400">No options</div>
+            ) : (
+              options.map((opt) => {
+                const checked = selected.includes(opt);
+                return (
+                  <label
+                    key={opt}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input type="checkbox" checked={checked} onChange={() => toggle(opt)} />
+                    {opt}
+                  </label>
+                );
+              })
+            )}
+          </div>
+          {hasSelection && (
+            <div className="border-t border-gray-100 mt-1 pt-1">
+              <button
+                onClick={() => onChange([])}
+                className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Closes the supplied filter popover on outside click or Esc.
+ * Caller owns the `openId` state; this just wires the dismiss listeners.
+ */
+export function useFilterDismiss(openId, setOpenId) {
+  useEffect(() => {
+    if (!openId) return;
+    const onDoc = (e) => {
+      if (!e.target.closest?.('[data-filter-pop]')) setOpenId(null);
+    };
+    const onKey = (e) => e.key === 'Escape' && setOpenId(null);
+    window.addEventListener('click', onDoc);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', onDoc);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openId, setOpenId]);
 }
 
 export default function AppShell({ children }) {

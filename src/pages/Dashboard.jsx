@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FilterDropdown, useFilterDismiss } from '../components/AppShell';
 import {
   Search,
   Bell,
@@ -241,8 +242,8 @@ function DateRangeButtons({ value, onChange, customRange, onCustomRangeChange })
         )}
       </div>
       <div className="inline-flex">
-        {seg('30', 'Last 30 Days', 'left')}
-        {seg('7', 'Last 7 Days', 'right')}
+        {seg('7', 'Last 7 Days', 'left')}
+        {seg('30', 'Last 30 Days', 'right')}
       </div>
     </div>
   );
@@ -513,108 +514,6 @@ function ApprovalRequests({ onOpen, onViewAll }) {
 }
 
 /* ----------------------- Filters bar ------------------------ */
-function FilterDropdown({ label, options, selected, onChange }) {
-  const [open, setOpen] = useState(false);
-  const hasSelection = selected.length > 0;
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => {
-      if (!e.target.closest?.('[data-filter-pop]')) setOpen(false);
-    };
-    const onKey = (e) => e.key === 'Escape' && setOpen(false);
-    window.addEventListener('click', onDoc);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('click', onDoc);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  const toggle = (value) => {
-    if (selected.includes(value)) onChange(selected.filter((v) => v !== value));
-    else onChange([...selected, value]);
-  };
-
-  const summary =
-    selected.length === 1
-      ? selected[0]
-      : selected.length > 1
-      ? `${selected.length} selected`
-      : '';
-
-  return (
-    <div className="relative inline-block" data-filter-pop>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border transition ${
-          hasSelection
-            ? 'bg-blue-50 border-[#12297D]/30 text-[#12297D]'
-            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-        }`}
-      >
-        {hasSelection ? (
-          <>
-            <span className="font-medium">{label}:</span>
-            <span className="font-medium">{summary}</span>
-            <span
-              role="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange([]);
-              }}
-              className="ml-1 -mr-1 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-[#12297D]/15"
-            >
-              <X size={11} />
-            </span>
-          </>
-        ) : (
-          <>
-            <PlusCircle size={14} className="text-gray-400" />
-            {label}
-          </>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute z-40 mt-1.5 left-0 bg-white border border-gray-200 rounded-lg shadow-xl w-52 py-1.5">
-          <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
-            Filter by {label}
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            {options.map((opt) => {
-              const checked = selected.includes(opt);
-              return (
-                <label
-                  key={opt}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(opt)}
-                  />
-                  {opt}
-                </label>
-              );
-            })}
-          </div>
-          {hasSelection && (
-            <div className="border-t border-gray-100 mt-1 pt-1">
-              <button
-                onClick={() => onChange([])}
-                className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function FiltersRow({
   searchQuery,
   onSearchChange,
@@ -629,6 +528,9 @@ function FiltersRow({
   onStatusChange,
   onClearAll,
 }) {
+  const [openId, setOpenId] = useState(null);
+  useFilterDismiss(openId, setOpenId);
+
   const anyFilter = brandFilter.length || typeFilter.length || statusFilter.length || searchQuery;
   return (
     <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -650,9 +552,9 @@ function FiltersRow({
           </button>
         )}
       </div>
-      <FilterDropdown label="Brand"  options={brandOptions}  selected={brandFilter}  onChange={onBrandChange} />
-      <FilterDropdown label="Type"   options={typeOptions}   selected={typeFilter}   onChange={onTypeChange} />
-      <FilterDropdown label="Status" options={statusOptions} selected={statusFilter} onChange={onStatusChange} />
+      <FilterDropdown id="brand"  label="Brand"  options={brandOptions}  selected={brandFilter}  onChange={onBrandChange}  openId={openId} onOpenChange={setOpenId} />
+      <FilterDropdown id="type"   label="Type"   options={typeOptions}   selected={typeFilter}   onChange={onTypeChange}   openId={openId} onOpenChange={setOpenId} />
+      <FilterDropdown id="status" label="Status" options={statusOptions} selected={statusFilter} onChange={onStatusChange} openId={openId} onOpenChange={setOpenId} />
       {anyFilter ? (
         <button
           onClick={onClearAll}
@@ -1130,7 +1032,7 @@ function Field({ label, value, children }) {
 /* ============================ DASHBOARD ============================ */
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [dateRange, setDateRange] = useState('30');
+  const [dateRange, setDateRange] = useState('7');
   const [customRange, setCustomRange] = useState(null);
   const [monthOffset, setMonthOffset] = useState(0); // for Last 30 Days month nav
   const [tab, setTabRaw] = useState('all');
