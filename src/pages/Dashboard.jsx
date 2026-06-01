@@ -398,42 +398,80 @@ function CustomDateDropdown({
 }
 
 /* ------------------------ Weekly Calendar ------------------------- */
-function WeeklyCalendar({ weekStart, schedulesByDay, onCardClick }) {
+function dayKey(d) {
+  return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
+}
+function isInRange(d, range) {
+  if (!range?.start || !range?.end) return false;
+  const k = dayKey(d);
+  return k >= dayKey(range.start) && k <= dayKey(range.end);
+}
+
+function WeeklyCalendar({ weekStart, schedulesByDay, onCardClick, highlightRange }) {
   const start = weekStart || startOfWeek(TODAY);
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(start, i);
+    const inRange = isInRange(d, highlightRange);
+    const isToday = sameDay(d, TODAY);
     return {
       label: DAY_LABELS[i],
       date: d.getDate(),
-      isToday: sameDay(d, TODAY),
+      isToday,
+      inRange,
+      isEndpoint:
+        highlightRange?.start && highlightRange?.end &&
+        (sameDay(d, highlightRange.start) || sameDay(d, highlightRange.end)),
     };
   });
   return (
     <div className="grid grid-cols-7 gap-3">
-      {days.map((d) => (
-        <div key={d.label} className="flex flex-col">
-          <div className="text-sm text-gray-500 font-medium text-center mb-2">{d.label}</div>
-          <div
-            className="rounded-xl p-2 flex-1 min-h-[420px] space-y-2"
-            style={{ backgroundColor: LAV_BG }}
-          >
-            <div className="flex items-baseline gap-2 px-1 pt-1 pb-2">
-              <div
-                className={`text-base font-semibold ${
-                  d.isToday ? 'text-white' : 'text-gray-900'
-                } ${d.isToday ? 'inline-flex items-center justify-center w-7 h-7 rounded-full' : ''}`}
-                style={d.isToday ? { backgroundColor: NAVY } : undefined}
-              >
-                {d.date}
-              </div>
-              <div className="text-xs text-gray-400">(12 items)</div>
+      {days.map((d) => {
+        // A day is "filled" (navy circle, white text) when it's today OR a
+        // start/end endpoint of a custom range. Mid-range days get a softer
+        // outlined treatment so the range reads as a span, not a list of dots.
+        const isFilled = d.isToday || d.isEndpoint;
+        const isMidRange = d.inRange && !d.isEndpoint && !d.isToday;
+        const isHighlighted = d.isToday || d.inRange;
+
+        return (
+          <div key={d.label} className="flex flex-col">
+            <div
+              className={`text-sm font-medium text-center mb-2 ${
+                isHighlighted ? 'text-[#12297D]' : 'text-gray-500'
+              }`}
+            >
+              {d.label}
             </div>
-            {(schedulesByDay?.[d.label] || []).map((s, i) => (
-              <ScheduleCard key={i} {...s} onClick={() => onCardClick?.(s)} />
-            ))}
+            <div
+              className={`rounded-xl p-2 flex-1 min-h-[420px] space-y-2 ${
+                d.inRange ? 'ring-1 ring-[#12297D]/30' : ''
+              }`}
+              style={{
+                backgroundColor: d.inRange ? '#E2E8F9' : LAV_BG,
+              }}
+            >
+              <div className="flex items-baseline gap-2 px-1 pt-1 pb-2">
+                <div
+                  className={`text-base font-semibold ${
+                    isFilled
+                      ? 'text-white inline-flex items-center justify-center w-7 h-7 rounded-full'
+                      : isMidRange
+                      ? 'text-[#12297D] inline-flex items-center justify-center w-7 h-7 rounded-full border-2 border-[#12297D]/50'
+                      : 'text-gray-900'
+                  }`}
+                  style={isFilled ? { backgroundColor: NAVY } : undefined}
+                >
+                  {d.date}
+                </div>
+                <div className="text-xs text-gray-400">(12 items)</div>
+              </div>
+              {(schedulesByDay?.[d.label] || []).map((s, i) => (
+                <ScheduleCard key={i} {...s} onClick={() => onCardClick?.(s)} />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1256,6 +1294,7 @@ export default function Dashboard() {
                     ? startOfWeek(customRange.start)
                     : startOfWeek(TODAY)
                 }
+                highlightRange={dateRange === 'custom' ? customRange : null}
                 schedulesByDay={calendarSchedules}
                 onCardClick={openDrawerFor}
               />
