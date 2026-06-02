@@ -266,7 +266,14 @@ function NextButton({ onClick, label = 'Next', disabled, hint }) {
 /*  Top header + stepper                                                       */
 /* -------------------------------------------------------------------------- */
 
-function PageHeader({ title, onBack, onDiscard }) {
+function PageHeader({
+  title,
+  onBack,
+  onDiscard,
+  onSubmit,
+  submitLabel = 'Submit Changes',
+  submitEnabled = false,
+}) {
   return (
     <div className="border-b border-gray-200 bg-white">
       <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center">
@@ -278,12 +285,28 @@ function PageHeader({ title, onBack, onDiscard }) {
           Back
         </button>
         <div className="flex-1 text-center text-base font-semibold text-gray-900">{title}</div>
-        <button
-          onClick={onDiscard}
-          className="text-sm text-gray-400 hover:text-gray-600"
-        >
-          Discard
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onDiscard}
+            className="text-sm text-gray-400 hover:text-gray-600"
+          >
+            Discard
+          </button>
+          {onSubmit && (
+            <button
+              onClick={submitEnabled ? onSubmit : undefined}
+              disabled={!submitEnabled}
+              className={`text-sm font-medium px-4 py-2 rounded-md ${
+                submitEnabled
+                  ? 'text-white hover:opacity-90'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+              style={submitEnabled ? { backgroundColor: NAVY } : undefined}
+            >
+              {submitLabel}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -471,7 +494,11 @@ function SummarySidebar({
           onClick={() => onJumpTo(1, 'campaign-setup')}
         />
         <SidebarRow label="Schedule Name" value={scheduleName} />
-        <SidebarRow label="Brand" value={brand} />
+        {Array.isArray(brand) ? (
+          <SidebarList label="Brand" items={brand} />
+        ) : (
+          <SidebarRow label="Brand" value={brand} />
+        )}
         <SidebarList label="Billboard" items={selectedScreenNames} />
       </SidebarSection>
 
@@ -2176,3 +2203,59 @@ export default function CreateSchedule() {
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Shared exports — used by EditSchedule (and any future flows)               */
+/* -------------------------------------------------------------------------- */
+
+export {
+  NAVY,
+  LAV_HEADER,
+  LAV_BG,
+  SUB_BG,
+  TODAY,
+  MAX_END,
+  SCREEN_LIBRARY,
+  BRAND_OPTIONS,
+  WEEK_DAYS,
+  DAY_FULL,
+  TEMPLATE_LIBRARY,
+  PREVIOUS_BUNDLES,
+  parseDateDMY,
+  parseTime,
+  inferMediaType,
+  deriveContentId,
+  bundleItemCount,
+  SectionCard,
+  SubHeader,
+  Label,
+  TextInput,
+  SelectInput,
+  DateInput,
+  RadioCard,
+  NextButton,
+  PageHeader,
+  Stepper,
+  SidebarSection,
+  SidebarAnchor,
+  SidebarRow,
+  SidebarList,
+  SummarySidebar,
+  SlotRow,
+  CustomSlotsPanel,
+  WeeklySlotsPanel,
+  SlotConfigSection,
+  LayoutPreview,
+  LayoutSelectionSection,
+  TemplateCard,
+  BundleRow,
+  EmptyResults,
+  ContentSelectionSection,
+  ContentPlaybackSection,
+  OverviewField,
+  OverviewSection,
+  Pair,
+  BillboardCard,
+  BillboardReviewSection,
+  SuccessScreen,
+};
