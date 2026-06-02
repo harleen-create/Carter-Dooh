@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FilterDropdown, useFilterDismiss } from '../components/AppShell';
 import {
   Search,
@@ -753,6 +753,7 @@ function SchedulesTable({
   onEdit,
   onArchive,
   archived = false,
+  flashedIds = new Set(),
 }) {
   const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
   const someSelected = rows.some((r) => selectedIds.has(r.id));
@@ -797,11 +798,16 @@ function SchedulesTable({
             <>
               {rows.map((r) => {
                 const isSelected = selectedIds.has(r.id);
+                const isFlashing = flashedIds.has(r.id);
                 return (
                   <tr
                     key={r.id}
-                    className={`hover:bg-gray-50 transition ${
-                      isSelected ? 'bg-blue-50/40' : ''
+                    className={`transition-colors duration-1000 ${
+                      isFlashing
+                        ? 'bg-green-50'
+                        : isSelected
+                        ? 'bg-blue-50/40'
+                        : 'hover:bg-gray-50'
                     }`}
                   >
                     <td className="p-4">
@@ -818,6 +824,11 @@ function SchedulesTable({
                       >
                         {r.name}
                       </a>
+                      {isFlashing && (
+                        <span className="inline-block ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white align-middle animate-pulse">
+                          NEW
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 text-gray-700">
                       <DateCell date={r.startDate} time={r.startTime} />
@@ -1070,6 +1081,7 @@ function Field({ label, value, children }) {
 /* ============================ DASHBOARD ============================ */
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [dateRange, setDateRange] = useState('7');
   const [customRange, setCustomRange] = useState(null);
   const [monthOffset, setMonthOffset] = useState(0); // for Last 30 Days month nav
@@ -1077,6 +1089,7 @@ export default function Dashboard() {
   const [drawerContent, setDrawerContent] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [toast, setToast] = useState(null);
+  const [flashedIds, setFlashedIds] = useState(new Set());
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -1108,8 +1121,44 @@ export default function Dashboard() {
     { id: 's8', name: 'Independence Day Burst',         brand: 'Advertiser Specific', owner: 'Ruth Price', type: 'Recurring',   status: 'Archived', startDate: 'Aug 10, 2024', startTime: '09:00', endDate: 'Aug 16, 2024', endTime: '23:59', archivedAt: 'May 02, 2026 | 18:15' },
   ]);
 
+  /* -------- New schedule arrival from /create-schedule -------- */
+  useEffect(() => {
+    const ns = location.state?.newSchedule;
+    if (!ns) return;
+    setSchedules((prev) => {
+      if (prev.some((s) => s.id === ns.id)) return prev;
+      return [ns, ...prev];
+    });
+    setFlashedIds(new Set([ns.id]));
+    showToast(`"${ns.name}" created successfully.`);
+    // Clear router state so a refresh doesn't re-add the row.
+    window.history.replaceState({}, document.title);
+    const t = window.setTimeout(() => setFlashedIds(new Set()), 4000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openDrawerFor = (source) => {
-    // New random ID + image seed on every open
+    // If the schedule was created through the Create flow it carries a
+    // `content` snapshot — use it so the drawer mirrors the user's pick.
+    if (source?.content) {
+      const c = source.content;
+      setDrawerContent({
+        title: c.title || (source.name ? `${source.name} Billboard` : 'Untitled Billboard'),
+        contentId: c.contentId,
+        imageSeed: c.imageSeed,
+        status: source.status === 'Archived' ? 'Archived' : 'Active',
+        mediaType: c.mediaType,
+        duration: c.duration,
+        resolution: c.resolution,
+        owner: source.owner || 'Ruth Price',
+        lastUpdatedDate: c.lastUpdatedDate || 'May 29, 2026',
+        lastUpdatedTime: c.lastUpdatedTime || '14:00',
+      });
+      return;
+    }
+
+    // Otherwise (demo seed rows / calendar chips), generate playful mock data.
     const contentId = String(5000 + Math.floor(Math.random() * 5000));
     const imageSeed = Math.random().toString(36).slice(2, 10);
 
@@ -1349,6 +1398,7 @@ export default function Dashboard() {
                 onRowOpen={openDrawerFor}
                 onEdit={editSchedule}
                 onArchive={archiveSchedule}
+                flashedIds={flashedIds}
               />
               <Pagination
                 totalRows={visibleSchedules.length}

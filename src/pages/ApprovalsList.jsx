@@ -11,6 +11,10 @@ import {
   Eye,
   X,
   CheckCircle2,
+  XCircle,
+  Check,
+  ArrowLeft,
+  Undo2,
 } from 'lucide-react';
 import AppShell, {
   NAVY,
@@ -33,7 +37,88 @@ function SortHeader({ label }) {
   );
 }
 
-const ALL_REQUESTS = [
+function FeedbackPanel({ feedback, onUndo, onBackToList, onDashboard }) {
+  const approved = feedback.type === 'approved';
+  const Icon = approved ? CheckCircle2 : XCircle;
+  const headline = approved
+    ? `${feedback.items.length} request${feedback.items.length > 1 ? 's' : ''} approved`
+    : `${feedback.items.length} request${feedback.items.length > 1 ? 's' : ''} rejected`;
+  const subtitle = approved
+    ? 'Submitters have been notified. Schedules will move into Upcoming on their start date.'
+    : 'Submitters have been notified. Rejected schedules will not run.';
+  const tone = approved
+    ? { ringColor: '#16a34a', bg: '#ECFDF5', text: '#166534' }
+    : { ringColor: '#dc2626', bg: '#FEF2F2', text: '#991B1B' };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-white border border-gray-200 rounded-2xl p-8 mt-6 shadow-sm">
+        <div
+          className="w-14 h-14 rounded-full flex items-center justify-center mb-5"
+          style={{ backgroundColor: tone.bg }}
+        >
+          <Icon size={28} style={{ color: tone.ringColor }} />
+        </div>
+
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{headline}</h2>
+        <p className="text-sm text-gray-600 mb-6">{subtitle}</p>
+
+        <div className="mb-6">
+          <div className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-2">
+            {approved ? 'Approved schedules' : 'Rejected schedules'}
+          </div>
+          <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+            {feedback.items.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: tone.bg }}
+                >
+                  {approved ? (
+                    <Check size={12} style={{ color: tone.ringColor }} />
+                  ) : (
+                    <X size={12} style={{ color: tone.ringColor }} />
+                  )}
+                </span>
+                <span className="font-medium text-gray-900">{r.name}</span>
+                <span className="text-xs text-gray-400">({r.id})</span>
+                <span className="ml-auto text-xs text-gray-500">{r.brand}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="text-xs text-gray-400 mb-6">{feedback.timestamp}</div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBackToList}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-md text-white"
+            style={{ backgroundColor: NAVY }}
+          >
+            <ArrowLeft size={14} />
+            Back to Approvals
+          </button>
+          <button
+            onClick={onDashboard}
+            className="text-sm font-medium px-4 py-2.5 rounded-md text-gray-700 border border-gray-200 hover:bg-gray-50"
+          >
+            Go to Dashboard
+          </button>
+          <button
+            onClick={onUndo}
+            className="ml-auto inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 underline underline-offset-2"
+          >
+            <Undo2 size={14} />
+            Undo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const INITIAL_REQUESTS = [
   { id: '5678', name: 'Back to School Promo',         brand: 'Nike, India', owner: 'John Doe',   type: 'Fixed Slot', submitted: 'May 26, 2026 | 10:42', submittedDate: 'May 26, 2026', boards: 4 },
   { id: '5679', name: 'Samsung Fold Reveal',          brand: 'Samsung',     owner: 'Ruth Price', type: 'Multi-slot', submitted: 'May 25, 2026 | 16:08', submittedDate: 'May 25, 2026', boards: 2 },
   { id: '5680', name: 'Netflix Stranger Things 5',    brand: 'Netflix',     owner: 'Ruth Price', type: 'Recurring',  submitted: 'May 24, 2026 | 09:15', submittedDate: 'May 24, 2026', boards: 6 },
@@ -51,8 +136,12 @@ const BODY_MIN_PX = ROW_HEIGHT_PX * TARGET_ROWS;
 export default function ApprovalsList() {
   const navigate = useNavigate();
 
+  const [requests, setRequests] = useState(INITIAL_REQUESTS);
   const [selected, setSelected] = useState(new Set());
   const [toast, setToast] = useState(null);
+  // After bulk action we swap the table view for a feedback screen.
+  // shape: { type: 'approved' | 'rejected', items: Request[], timestamp: string, restoreSnapshot: Request[] }
+  const [feedback, setFeedback] = useState(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,12 +158,12 @@ export default function ApprovalsList() {
     showToast._t = window.setTimeout(() => setToast(null), 3000);
   };
 
-  const brandOptions = Array.from(new Set(ALL_REQUESTS.map((r) => r.brand))).sort();
-  const typeOptions = Array.from(new Set(ALL_REQUESTS.map((r) => r.type))).sort();
-  const ownerOptions = Array.from(new Set(ALL_REQUESTS.map((r) => r.owner))).sort();
-  const submittedOptions = Array.from(new Set(ALL_REQUESTS.map((r) => r.submittedDate)));
+  const brandOptions = Array.from(new Set(requests.map((r) => r.brand))).sort();
+  const typeOptions = Array.from(new Set(requests.map((r) => r.type))).sort();
+  const ownerOptions = Array.from(new Set(requests.map((r) => r.owner))).sort();
+  const submittedOptions = Array.from(new Set(requests.map((r) => r.submittedDate)));
 
-  const filtered = ALL_REQUESTS.filter((r) => {
+  const filtered = requests.filter((r) => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const hay = `${r.name} ${r.brand} ${r.owner} ${r.type} ${r.id}`.toLowerCase();
@@ -112,16 +201,28 @@ export default function ApprovalsList() {
   const allSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.id));
   const someSelected = filtered.some((r) => selected.has(r.id));
 
-  const approveSelected = () => {
-    const n = selected.size;
+  const runAction = (type) => {
+    if (selected.size === 0) return;
+    const items = requests.filter((r) => selected.has(r.id));
+    const snapshot = requests; // for undo
+    setRequests((prev) => prev.filter((r) => !selected.has(r.id)));
     setSelected(new Set());
-    showToast(`${n} request${n > 1 ? 's' : ''} approved.`);
+    setFeedback({
+      type,                                    // 'approved' | 'rejected'
+      items,
+      timestamp: 'May 29, 2026 · 14:00',
+      restoreSnapshot: snapshot,
+    });
   };
-  const rejectSelected = () => {
-    const n = selected.size;
-    setSelected(new Set());
-    showToast(`${n} request${n > 1 ? 's' : ''} rejected.`);
+  const approveSelected = () => runAction('approved');
+  const rejectSelected = () => runAction('rejected');
+
+  const undoFeedback = () => {
+    if (!feedback) return;
+    setRequests(feedback.restoreSnapshot);
+    setFeedback(null);
   };
+  const dismissFeedback = () => setFeedback(null);
 
   return (
     <AppShell>
@@ -150,12 +251,21 @@ export default function ApprovalsList() {
             </div>
           </div>
           <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${PINK_PILL}`}>
-            {ALL_REQUESTS.length} Pending
+            {requests.length} Pending
           </span>
         </div>
       </div>
 
       <div className="max-w-[1440px] mx-auto px-8 py-6">
+        {feedback ? (
+          <FeedbackPanel
+            feedback={feedback}
+            onUndo={undoFeedback}
+            onBackToList={dismissFeedback}
+            onDashboard={() => navigate('/dashboard')}
+          />
+        ) : (
+        <>
         {/* Filters */}
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <div className="relative flex-1 min-w-[240px] max-w-xs">
@@ -341,6 +451,8 @@ export default function ApprovalsList() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {toast && (
