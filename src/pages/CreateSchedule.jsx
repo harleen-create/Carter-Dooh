@@ -56,6 +56,76 @@ const BRAND_OPTIONS = ['Nike, India', 'Samsung', 'Netflix', 'Apple', "McDonald's
 
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+/* -------- Layout → Zone mapping --------
+ * Each zone declares its label, pixel dimensions, and the rect it occupies
+ * within the screen (as 0..1 proportions of width/height) so the LayoutDiagram
+ * can highlight it visually.
+ */
+const LAYOUT_ZONES = {
+  fullscreen: [
+    { id: 'main',   label: 'Main',         width: 1920, height: 1080, rect: [0, 0, 1, 1] },
+  ],
+  half: [
+    { id: 'top',    label: 'Top Half',     width: 1920, height: 540,  rect: [0, 0,   1, 0.5] },
+    { id: 'bottom', label: 'Bottom Half',  width: 1920, height: 540,  rect: [0, 0.5, 1, 0.5] },
+  ],
+  quadrant: [
+    { id: 'q1', label: 'Zone 1', sublabel: 'Top Left',     width: 960, height: 540, rect: [0,   0,   0.5, 0.5] },
+    { id: 'q2', label: 'Zone 2', sublabel: 'Top Right',    width: 960, height: 540, rect: [0.5, 0,   0.5, 0.5] },
+    { id: 'q3', label: 'Zone 3', sublabel: 'Bottom Left',  width: 960, height: 540, rect: [0,   0.5, 0.5, 0.5] },
+    { id: 'q4', label: 'Zone 4', sublabel: 'Bottom Right', width: 960, height: 540, rect: [0.5, 0.5, 0.5, 0.5] },
+  ],
+  banner: [
+    { id: 'main',  label: 'Main Content', width: 1920, height: 980, rect: [0, 0,           1, 980 / 1080] },
+    { id: 'strip', label: 'Banner Strip', width: 1920, height: 100, rect: [0, 980 / 1080,  1, 100 / 1080] },
+  ],
+};
+
+const LAYOUT_LABELS = {
+  fullscreen: 'Fullscreen',
+  half: 'Half Screen',
+  quadrant: 'Quadrant',
+  banner: 'Banner',
+};
+
+function zonesForLayout(layout) {
+  return LAYOUT_ZONES[layout] || LAYOUT_ZONES.fullscreen;
+}
+
+/** Tiny SVG showing a layout with an optional zone highlighted. */
+function LayoutDiagram({ layout, highlightZoneId, size = 'sm' }) {
+  const dims = { sm: [80, 45], md: [120, 68], lg: [200, 113] };
+  const [W, H] = dims[size] || dims.sm;
+  const zones = zonesForLayout(layout);
+  return (
+    <svg
+      width={W}
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      className="rounded shrink-0"
+      aria-hidden="true"
+    >
+      <rect width={W} height={H} rx={3} fill="#F1F5F9" />
+      {zones.map((z) => {
+        const [rx, ry, rw, rh] = z.rect;
+        const isHL = highlightZoneId === z.id;
+        return (
+          <rect
+            key={z.id}
+            x={rx * W + 1}
+            y={ry * H + 1}
+            width={Math.max(rw * W - 2, 0)}
+            height={Math.max(rh * H - 2, 0)}
+            fill={isHL ? NAVY : '#C7D0E8'}
+            stroke="white"
+            strokeWidth={1}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 
 /* -------------------------------------------------------------------------- */
 /*  Date + time helpers                                                        */
@@ -569,14 +639,66 @@ function SummarySidebar({
 /*  STEP 1 — Schedule Configuration                                            */
 /* -------------------------------------------------------------------------- */
 
-function ScheduleConfigSection({
-  expanded, onToggle, onActivate,
-  scheduleName, setScheduleName,
-  brand, setBrand,
-  selectedScreens, toggleScreen, removeScreen,
-  onNext, nextDisabled, nextHint,
-}) {
+/**
+ * BillboardThumbnail — stylized SVG mock of a digital billboard, keyed to the
+ * screen so every entry gets a distinct accent color and a location code on
+ * the screen face. Replaces the random Picsum photos with on-brand imagery.
+ */
+const THUMB_PALETTES = [
+  { bg: '#F1F5F9', screen: '#12297D', accent: '#94A3B8' },
+  { bg: '#FEF3C7', screen: '#D97706', accent: '#92400E' },
+  { bg: '#DBEAFE', screen: '#1D4ED8', accent: '#1E40AF' },
+  { bg: '#FCE7F3', screen: '#BE185D', accent: '#831843' },
+  { bg: '#D1FAE5', screen: '#059669', accent: '#065F46' },
+  { bg: '#FEE2E2', screen: '#DC2626', accent: '#991B1B' },
+  { bg: '#E0E7FF', screen: '#4F46E5', accent: '#3730A3' },
+  { bg: '#CFFAFE', screen: '#0E7490', accent: '#155E75' },
+];
+
+function BillboardThumbnail({ screen, size = 48 }) {
+  const key = screen?.seed || screen?.id || screen?.name || '';
+  const hash = Array.from(String(key)).reduce((a, c) => a + c.charCodeAt(0), 0);
+  const p = THUMB_PALETTES[hash % THUMB_PALETTES.length];
+  // Code: first three letters of location, fallback to screen name initials.
+  const source = screen?.location || screen?.name || 'BB';
+  const code = source.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      className="rounded-md shrink-0"
+      aria-label={screen?.name || 'Billboard thumbnail'}
+    >
+      <rect width={48} height={48} rx={6} fill={p.bg} />
+      <rect x={5} y={9} width={38} height={22} rx={2.5} fill={p.screen} />
+      <rect x={7} y={11} width={34} height={1} fill="white" opacity={0.28} />
+      <text
+        x={24}
+        y={24}
+        textAnchor="middle"
+        fill="white"
+        fontSize="9"
+        fontWeight="700"
+        fontFamily="Inter, system-ui, sans-serif"
+        letterSpacing="0.5"
+      >
+        {code}
+      </text>
+      <rect x={22.5} y={31} width={3} height={9} fill={p.accent} />
+      <rect x={14} y={40} width={20} height={2.5} rx={1} fill={p.accent} />
+    </svg>
+  );
+}
+
+/**
+ * ScreenSelector — two-pane screen picker.
+ *  - Left: library table (search + rows)
+ *  - Right: selected screen cards + Daily Total footer
+ */
+function ScreenSelector({ selectedScreens, toggleScreen, removeScreen }) {
   const [search, setSearch] = useState('');
+
   const filtered = SCREEN_LIBRARY.filter((s) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -587,6 +709,127 @@ function ScheduleConfigSection({
     );
   });
 
+  const dailyTotal = useMemo(() => {
+    let sum = 0;
+    selectedScreens.forEach((id) => {
+      const s = SCREEN_LIBRARY.find((sc) => sc.id === id);
+      if (s) sum += s.price;
+    });
+    return sum;
+  }, [selectedScreens]);
+
+  return (
+    <div className="grid grid-cols-2 gap-4 mt-2">
+      {/* Library */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+        <div className="px-4 py-2.5 text-xs font-medium text-gray-600" style={{ backgroundColor: SUB_BG }}>
+          Total Screen: 45
+        </div>
+        <div className="p-3 border-b border-gray-100">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search billboards by name, ID or Location"
+              className="w-full text-xs bg-white border border-gray-200 rounded-md pl-9 pr-3 py-2 outline-none focus:border-gray-400"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-[24px_1fr_90px_90px] gap-3 px-4 py-2 text-[11px] font-medium text-gray-500 border-b border-gray-100">
+          <span></span>
+          <span>Screen</span>
+          <span>Location</span>
+          <span>Price</span>
+        </div>
+        <div className="max-h-[28rem] overflow-y-auto divide-y divide-gray-100">
+          {filtered.map((s) => {
+            const checked = selectedScreens.has(s.id);
+            return (
+              <label
+                key={s.id}
+                className={`grid grid-cols-[24px_1fr_90px_90px] gap-3 items-center px-4 py-3 cursor-pointer ${
+                  checked ? 'bg-blue-50/60' : 'hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleScreen(s.id)}
+                />
+                <div className="flex items-center gap-3 min-w-0">
+                  <BillboardThumbnail screen={s} />
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-[#12297D] font-medium">Screen ID: {s.id}</div>
+                    <div className="text-sm font-semibold text-gray-900 truncate">{s.name}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-700">{s.location}</div>
+                <div className="text-xs font-semibold text-gray-900">$ {s.price}/day</div>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col" style={{ backgroundColor: SUB_BG }}>
+        <div className="px-4 py-2.5 text-xs font-medium text-gray-600 bg-white border-b border-gray-100">
+          Selected Screen: {selectedScreens.size}
+        </div>
+        {selectedScreens.size === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+            <div className="text-sm text-gray-400 font-medium">No screens selected yet.</div>
+            <div className="text-xs text-gray-400 mt-1">
+              Pick screens from the list to add them here.
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="p-3 space-y-2 overflow-y-auto max-h-[24rem]">
+              {SCREEN_LIBRARY.filter((s) => selectedScreens.has(s.id)).map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-3 bg-white border border-gray-200 rounded-md px-3 py-2.5"
+                >
+                  <BillboardThumbnail screen={s} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] text-[#12297D] font-medium">Screen ID: {s.id}</div>
+                    <div className="text-sm font-semibold text-gray-900 truncate">{s.name}</div>
+                  </div>
+                  <div className="text-xs font-semibold text-gray-900 shrink-0">$ {s.price}/day</div>
+                  <button
+                    onClick={() => removeScreen(s.id)}
+                    className="text-red-500 hover:text-red-700 p-1"
+                    aria-label="Remove from selection"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {/* Daily Total footer */}
+            <div className="px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+              <span className="text-xs text-gray-500 font-medium">Daily Total</span>
+              <span className="text-sm font-bold" style={{ color: NAVY }}>
+                $ {dailyTotal}/day
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScheduleConfigSection({
+  expanded, onToggle, onActivate,
+  scheduleName, setScheduleName,
+  brand, setBrand,
+  selectedScreens, toggleScreen, removeScreen,
+  onNext, nextDisabled, nextHint,
+}) {
   return (
     <SectionCard title="Schedule Configuration" expanded={expanded} onToggle={() => { onToggle(); onActivate(); }}>
       <SubHeader
@@ -608,103 +851,11 @@ function ScheduleConfigSection({
 
       <Label required info>Select Screen</Label>
 
-      <div className="grid grid-cols-2 gap-4 mt-2">
-        {/* Library */}
-        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col">
-          <div className="px-4 py-2.5 text-xs font-medium text-gray-600" style={{ backgroundColor: SUB_BG }}>
-            Total Screen: 45
-          </div>
-          <div className="p-3 border-b border-gray-100">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search billboards by name, ID or Location"
-                className="w-full text-xs bg-white border border-gray-200 rounded-md pl-9 pr-3 py-2 outline-none focus:border-gray-400"
-              />
-            </div>
-          </div>
-          {/* Table header */}
-          <div className="grid grid-cols-[24px_1fr_90px_90px] gap-3 px-4 py-2 text-[11px] font-medium text-gray-500 border-b border-gray-100">
-            <span></span>
-            <span>Screen</span>
-            <span>Location</span>
-            <span>Price</span>
-          </div>
-          <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
-            {filtered.map((s) => {
-              const checked = selectedScreens.has(s.id);
-              return (
-                <label
-                  key={s.id}
-                  className={`grid grid-cols-[24px_1fr_90px_90px] gap-3 items-center px-4 py-3 cursor-pointer ${
-                    checked ? 'bg-blue-50/60' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleScreen(s.id)}
-                  />
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={`https://picsum.photos/seed/${s.seed}/120/120`}
-                      alt={s.name}
-                      className="w-12 h-12 rounded-md object-cover bg-gray-100 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-[11px] text-[#2563EB] font-medium">Screen ID: {s.id}</div>
-                      <div className="text-sm font-semibold text-gray-900 truncate">{s.name}</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-700">{s.location}</div>
-                  <div className="text-xs font-semibold text-gray-900">$ {s.price}/day</div>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Selected */}
-        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col" style={{ backgroundColor: SUB_BG }}>
-          <div className="px-4 py-2.5 text-xs font-medium text-gray-600 bg-white border-b border-gray-100">
-            Selected Screen: {selectedScreens.size}
-          </div>
-          {selectedScreens.size === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-              <div className="text-sm text-gray-400 font-medium">No screens selected yet.</div>
-              <div className="text-xs text-gray-400 mt-1">
-                Pick screens from the list to add them here.
-              </div>
-            </div>
-          ) : (
-            <div className="p-3 space-y-2 overflow-y-auto max-h-96">
-              {SCREEN_LIBRARY.filter((s) => selectedScreens.has(s.id)).map((s) => (
-                <div key={s.id} className="flex items-center gap-3 bg-white border border-gray-200 rounded-md px-3 py-2.5">
-                  <img
-                    src={`https://picsum.photos/seed/${s.seed}/120/120`}
-                    alt={s.name}
-                    className="w-12 h-12 rounded-md object-cover bg-gray-100 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] text-[#2563EB] font-medium">Screen ID: {s.id}</div>
-                    <div className="text-sm font-semibold text-gray-900 truncate">{s.name}</div>
-                  </div>
-                  <div className="text-xs font-semibold text-gray-900 shrink-0">$ {s.price}/day</div>
-                  <button
-                    onClick={() => removeScreen(s.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <ScreenSelector
+        selectedScreens={selectedScreens}
+        toggleScreen={toggleScreen}
+        removeScreen={removeScreen}
+      />
 
       <NextButton onClick={onNext} disabled={nextDisabled} hint={nextHint} />
     </SectionCard>
@@ -1040,6 +1191,18 @@ function LayoutPreview({ kind }) {
   if (kind === 'fullscreen') {
     return <div className="w-full aspect-[16/9] rounded-md" style={{ backgroundColor: PRIMARY }} />;
   }
+  if (kind === 'half') {
+    // Top half = ad, bottom half = neutral (other content)
+    return (
+      <div
+        className="w-full aspect-[16/9] rounded-md overflow-hidden grid grid-rows-2 bg-white"
+        style={{ outline: `2px solid ${PRIMARY}`, outlineOffset: -2 }}
+      >
+        <div style={{ backgroundColor: PRIMARY }} />
+        <div style={{ backgroundColor: SECONDARY }} />
+      </div>
+    );
+  }
   if (kind === 'quadrant') {
     return (
       <div
@@ -1069,6 +1232,7 @@ function LayoutPreview({ kind }) {
 function LayoutSelectionSection({ expanded, onToggle, onActivate, layout, setLayout, onNext }) {
   const options = [
     { id: 'fullscreen', label: 'Fullscreen' },
+    { id: 'half',       label: 'Half Screen' },
     { id: 'quadrant',   label: 'Quadrant' },
     { id: 'banner',     label: 'Banner' },
   ];
@@ -1080,7 +1244,7 @@ function LayoutSelectionSection({ expanded, onToggle, onActivate, layout, setLay
         helper="Choose how and where your ad will appear on selected billboards."
       />
       <Label>Layout</Label>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         {options.map((o) => (
           <button
             key={o.id}
@@ -1212,12 +1376,146 @@ function EmptyResults({ label }) {
   );
 }
 
+/**
+ * Per-zone upload area. Each zone gets its own search input, dashed upload
+ * button, list of uploaded files, and an option to copy a creative from
+ * another zone in the same layout.
+ */
+function ZoneUploadArea({
+  zone, layoutId, files,
+  otherFilledZones,
+  onUpload, onRemove, onCopyFrom,
+}) {
+  const [search, setSearch] = useState('');
+  const [copyOpen, setCopyOpen] = useState(false);
+
+  // Filtered files by per-zone search (prototype: filters the local file list)
+  const visible = files.filter((f) => {
+    if (!search) return true;
+    return f.name.toLowerCase().includes(search.toLowerCase());
+  });
+
+  // The mock "uploaded creative" is treated as 1920×1080 source. If the zone
+  // is a different size, surface a friendly scaling warning.
+  const dimMismatch =
+    files.length > 0 && (zone.width !== 1920 || zone.height !== 1080);
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white">
+      <div className="flex items-center gap-3 mb-3">
+        <LayoutDiagram layout={layoutId} highlightZoneId={zone.id} size="sm" />
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-gray-900 truncate">
+            {zone.label}
+            {zone.sublabel && (
+              <span className="text-gray-400 font-normal ml-1">({zone.sublabel})</span>
+            )}
+          </div>
+          <div className="text-xs text-gray-500">{zone.width}×{zone.height}</div>
+        </div>
+        <div className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-md" style={{ backgroundColor: files.length ? '#DCFCE7' : LAV_BG, color: files.length ? '#16a34a' : NAVY }}>
+          {files.length ? `${files.length} ready` : 'Empty'}
+        </div>
+      </div>
+
+      <div className="relative mb-3">
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search library"
+          className="w-full text-xs bg-white border border-gray-200 rounded-md pl-8 pr-3 py-1.5 outline-none focus:border-gray-400"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={onUpload}
+        className="w-full border-2 border-dashed border-gray-300 rounded-lg py-6 flex flex-col items-center justify-center text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition"
+      >
+        <Upload size={18} className="mb-1.5 text-gray-400" />
+        <span className="text-xs font-medium">Upload Content</span>
+        <span className="text-[10px] text-gray-400 mt-0.5">JPG, PNG, MP4 up to 50MB</span>
+      </button>
+
+      {visible.length > 0 && (
+        <div className="mt-2 border border-gray-100 rounded-md divide-y divide-gray-100">
+          {visible.map((f) => (
+            <div key={f.id} className="flex items-center gap-2 px-2 py-1.5">
+              <img
+                src={`https://picsum.photos/seed/${f.seed}/120/120`}
+                alt={f.name}
+                className="w-8 h-8 rounded object-cover bg-gray-100 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-gray-900 truncate">{f.name}</div>
+                <div className="text-[10px] text-gray-500">{f.size}</div>
+              </div>
+              <button
+                onClick={() => onRemove(f.id)}
+                className="text-red-500 hover:text-red-700 p-1"
+                aria-label={`Remove ${f.name}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {dimMismatch && (
+        <div className="mt-2 flex items-start gap-1 text-[11px] text-amber-700">
+          <AlertCircle size={11} className="mt-[2px] shrink-0" />
+          <span>
+            This creative is 1920×1080 but the zone requires {zone.width}×{zone.height}. It will be cropped or scaled.
+          </span>
+        </div>
+      )}
+
+      {otherFilledZones.length > 0 && (
+        <div className="mt-3 relative">
+          <button
+            type="button"
+            onClick={() => setCopyOpen((v) => !v)}
+            className="text-[11px] font-medium underline underline-offset-2"
+            style={{ color: NAVY }}
+          >
+            Use same creative as another zone
+          </button>
+          {copyOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-20"
+                onClick={() => setCopyOpen(false)}
+              />
+              <div className="absolute z-30 mt-1.5 bg-white border border-gray-200 rounded-md shadow-lg py-1 w-56">
+                {otherFilledZones.map((oz) => (
+                  <button
+                    key={oz.id}
+                    onClick={() => { onCopyFrom(oz.id); setCopyOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <LayoutDiagram layout={layoutId} highlightZoneId={oz.id} size="sm" />
+                    <span className="text-gray-800">{oz.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ContentSelectionSection({
   expanded, onToggle, onActivate,
+  layout,
   contentSource, setContentSource,
   selectedTemplates, toggleTemplate,
   selectedBundle, setSelectedBundle,
-  uploadedFiles, removeUploadedFile, simulateUpload,
+  zoneFiles, addFileToZone, removeFileFromZone, copyZoneContent,
   onNext, nextDisabled, nextHint,
 }) {
   const [search, setSearch] = useState('');
@@ -1237,11 +1535,11 @@ function ContentSelectionSection({
   const filteredTemplates = TEMPLATE_LIBRARY.filter((t) => matches(t.name, t.tag));
   const filteredBundles = PREVIOUS_BUNDLES.filter((b) => matches(b.name, b.owner));
 
+  const zones = zonesForLayout(layout);
+  const filledCount = zones.filter((z) => (zoneFiles[z.id] || []).length > 0).length;
+
   const selectionSummary = (() => {
-    if (contentSource === 'upload') {
-      if (uploadedFiles.length === 0) return null;
-      return `${uploadedFiles.length} file${uploadedFiles.length > 1 ? 's' : ''} ready to upload`;
-    }
+    if (contentSource === 'upload') return null; // counter at bottom does this job
     if (contentSource === 'templates') {
       if (selectedTemplates.size === 0) return null;
       return `${selectedTemplates.size} template${selectedTemplates.size > 1 ? 's' : ''} selected`;
@@ -1252,19 +1550,34 @@ function ContentSelectionSection({
     return null;
   })();
 
-  const searchPlaceholder = {
-    upload: 'Search library',
-    templates: 'Search templates by name or tag',
-    previously: 'Search previous bundles',
-  }[contentSource];
+  // Quadrant grid layout, others stack vertically (banner gets a special
+  // aspect ratio split so the strip area visually reads as smaller).
+  const wrapperClass =
+    layout === 'quadrant'
+      ? 'grid grid-cols-2 gap-4'
+      : 'space-y-4';
 
   return (
     <SectionCard title="Content Selection" expanded={expanded} onToggle={() => { onToggle(); onActivate(); }}>
       <SubHeader
         icon={ImageIcon}
         title="Content Selection"
-        helper="Choose one or more creatives from your content library."
+        helper="Choose creatives for each zone in your selected layout."
       />
+
+      {/* Selected layout summary */}
+      <div className="flex items-center gap-3 px-4 py-3 mb-5 rounded-lg border border-gray-200 bg-white">
+        <LayoutDiagram layout={layout} size="md" />
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-gray-900">
+            {LAYOUT_LABELS[layout]} Layout
+          </div>
+          <div className="text-xs text-gray-500">
+            {zones.length} zone{zones.length === 1 ? '' : 's'} —{' '}
+            {zones.map((z) => z.label).join(' · ')}
+          </div>
+        </div>
+      </div>
 
       <Label>Content Source</Label>
       <div className="grid grid-cols-3 gap-3 mb-6">
@@ -1273,88 +1586,119 @@ function ContentSelectionSection({
         <RadioCard selected={contentSource === 'previously'} onClick={() => handleSourceChange('previously')} title="Use Previously Scheduled Bundle" />
       </div>
 
-      <div className="relative mb-4">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="w-full text-sm bg-white border border-gray-200 rounded-md pl-9 pr-3 py-2 outline-none focus:border-gray-400"
-        />
-      </div>
+      {/* Templates + Bundle modes use a single shared search input */}
+      {contentSource !== 'upload' && (
+        <div className="relative mb-4">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={
+              contentSource === 'templates'
+                ? 'Search templates by name or tag'
+                : 'Search previous bundles'
+            }
+            className="w-full text-sm bg-white border border-gray-200 rounded-md pl-9 pr-3 py-2 outline-none focus:border-gray-400"
+          />
+        </div>
+      )}
 
       {/* Body — swaps per source */}
       {contentSource === 'upload' && (
         <>
-          <button
-            type="button"
-            onClick={simulateUpload}
-            className="w-full border-2 border-dashed border-gray-300 rounded-lg py-10 flex flex-col items-center justify-center text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition"
-          >
-            <Upload size={22} className="mb-2 text-gray-400" />
-            <span className="text-sm font-medium">Upload Content</span>
-            <span className="text-xs text-gray-400 mt-1">JPG, PNG, MP4 up to 50MB</span>
-          </button>
-          {uploadedFiles.length > 0 && (
-            <div className="mt-3 border border-gray-200 rounded-lg divide-y divide-gray-100">
-              {uploadedFiles.map((f) => (
-                <div key={f.id} className="flex items-center gap-3 px-3 py-2">
-                  <img
-                    src={`https://picsum.photos/seed/${f.seed}/120/120`}
-                    alt={f.name}
-                    className="w-10 h-10 rounded-md object-cover bg-gray-100 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">{f.name}</div>
-                    <div className="text-[11px] text-gray-500">{f.size}</div>
-                  </div>
-                  <button
-                    onClick={() => removeUploadedFile(f.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                    aria-label={`Remove ${f.name}`}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
+          <div className={wrapperClass}>
+            {zones.map((zone) => {
+              const files = zoneFiles[zone.id] || [];
+              const otherFilledZones = zones.filter(
+                (z) => z.id !== zone.id && (zoneFiles[z.id] || []).length > 0
+              );
+              return (
+                <ZoneUploadArea
+                  key={zone.id}
+                  zone={zone}
+                  layoutId={layout}
+                  files={files}
+                  otherFilledZones={otherFilledZones}
+                  onUpload={() => addFileToZone(zone.id)}
+                  onRemove={(fileId) => removeFileFromZone(zone.id, fileId)}
+                  onCopyFrom={(sourceZoneId) => copyZoneContent(sourceZoneId, zone.id)}
+                />
+              );
+            })}
+          </div>
+
+          {/* Counter */}
+          {zones.length > 1 && (
+            <div className="mt-4 flex items-center gap-3">
+              <div className="text-xs text-gray-700 font-medium">
+                {filledCount} of {zones.length} zones filled
+              </div>
+              <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${(filledCount / zones.length) * 100}%`,
+                    backgroundColor: filledCount === zones.length ? '#16a34a' : NAVY,
+                  }}
+                />
+              </div>
+              {filledCount === zones.length && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700">
+                  <CheckCircle2 size={12} /> Complete
+                </span>
+              )}
             </div>
           )}
         </>
       )}
 
       {contentSource === 'templates' && (
-        filteredTemplates.length === 0 ? (
-          <EmptyResults label="templates" />
-        ) : (
-          <div className="grid grid-cols-3 gap-3">
-            {filteredTemplates.map((t) => (
-              <TemplateCard
-                key={t.id}
-                t={t}
-                selected={selectedTemplates.has(t.id)}
-                onClick={() => toggleTemplate(t.id)}
-              />
-            ))}
-          </div>
-        )
+        <>
+          {zones.length > 1 && (
+            <div className="text-[11px] text-gray-500 mb-3">
+              Selected templates will apply to every zone in this layout.
+            </div>
+          )}
+          {filteredTemplates.length === 0 ? (
+            <EmptyResults label="templates" />
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {filteredTemplates.map((t) => (
+                <TemplateCard
+                  key={t.id}
+                  t={t}
+                  selected={selectedTemplates.has(t.id)}
+                  onClick={() => toggleTemplate(t.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {contentSource === 'previously' && (
-        filteredBundles.length === 0 ? (
-          <EmptyResults label="bundles" />
-        ) : (
-          <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
-            {filteredBundles.map((b) => (
-              <BundleRow
-                key={b.id}
-                b={b}
-                selected={selectedBundle === b.id}
-                onClick={() => setSelectedBundle(selectedBundle === b.id ? null : b.id)}
-              />
-            ))}
-          </div>
-        )
+        <>
+          {zones.length > 1 && (
+            <div className="text-[11px] text-gray-500 mb-3">
+              The selected bundle will play across every zone in this layout.
+            </div>
+          )}
+          {filteredBundles.length === 0 ? (
+            <EmptyResults label="bundles" />
+          ) : (
+            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+              {filteredBundles.map((b) => (
+                <BundleRow
+                  key={b.id}
+                  b={b}
+                  selected={selectedBundle === b.id}
+                  onClick={() => setSelectedBundle(selectedBundle === b.id ? null : b.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {selectionSummary && (
@@ -1369,40 +1713,15 @@ function ContentSelectionSection({
   );
 }
 
-function ContentPlaybackSection({
-  expanded, onToggle, onActivate,
-  onNext, nextDisabled, nextHint,
-  playbackItems = [],
-}) {
+/** Single zone playback row with drag-to-reorder. */
+function ZonePlaybackRow({ zone, layoutId, items, onReorder }) {
   const [open, setOpen] = useState(true);
-  const [items, setItems] = useState(playbackItems);
   const [draggedIdx, setDraggedIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
-
-  // Re-sync from props when the selection (set of IDs) changes — but keep
-  // the user's reordering if the same items are still there.
-  useEffect(() => {
-    const sameSet =
-      items.length === playbackItems.length &&
-      items.every((it) => playbackItems.some((p) => p.id === it.id));
-    if (!sameSet) setItems(playbackItems);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playbackItems]);
-
-  const moveItem = (from, to) => {
-    if (from === to) return;
-    setItems((arr) => {
-      const next = [...arr];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
 
   const onDragStart = (e, idx) => {
     setDraggedIdx(idx);
     e.dataTransfer.effectAllowed = 'move';
-    // Firefox requires data to actually start a drag
     try { e.dataTransfer.setData('text/plain', String(idx)); } catch {}
   };
   const onDragOver = (e, idx) => {
@@ -1412,80 +1731,106 @@ function ContentPlaybackSection({
   };
   const onDrop = (e, idx) => {
     e.preventDefault();
-    if (draggedIdx !== null) moveItem(draggedIdx, idx);
+    if (draggedIdx !== null && draggedIdx !== idx) onReorder(draggedIdx, idx);
     setDraggedIdx(null);
     setOverIdx(null);
   };
-  const onDragEnd = () => {
-    setDraggedIdx(null);
-    setOverIdx(null);
-  };
+  const onDragEnd = () => { setDraggedIdx(null); setOverIdx(null); };
 
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <LayoutDiagram layout={layoutId} highlightZoneId={zone.id} size="sm" />
+          <div className="min-w-0 text-left">
+            <div className="text-sm font-medium text-gray-900 truncate">
+              {zone.label}
+              {zone.sublabel && (
+                <span className="text-gray-400 font-normal ml-1">({zone.sublabel})</span>
+              )}
+            </div>
+            <div className="text-[11px] text-gray-500">
+              {items.length} creative{items.length === 1 ? '' : 's'} · {zone.width}×{zone.height}
+            </div>
+          </div>
+        </div>
+        {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+      </button>
+
+      {open && (
+        items.length === 0 ? (
+          <div className="border-t border-gray-100 px-4 py-6 text-center">
+            <div className="text-xs text-gray-400">
+              No creatives uploaded to this zone yet.
+            </div>
+          </div>
+        ) : (
+          <div className="border-t border-gray-100 divide-y divide-gray-100">
+            {items.map((item, idx) => {
+              const isDragged = draggedIdx === idx;
+              const isOver = overIdx === idx && draggedIdx !== null && draggedIdx !== idx;
+              return (
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={(e) => onDragStart(e, idx)}
+                  onDragOver={(e) => onDragOver(e, idx)}
+                  onDrop={(e) => onDrop(e, idx)}
+                  onDragEnd={onDragEnd}
+                  className={`flex items-center gap-3 px-4 py-3 text-sm cursor-move select-none transition ${
+                    isDragged ? 'opacity-40' : isOver ? 'bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  style={isOver ? { boxShadow: `inset 0 2px 0 ${NAVY}` } : undefined}
+                >
+                  <GripVertical size={14} className="text-gray-400 shrink-0" />
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
+                    style={{ backgroundColor: NAVY }}
+                  >
+                    {idx + 1}
+                  </span>
+                  <span className="text-gray-900 truncate">{item.name}</span>
+                  <span className="ml-auto text-xs text-gray-400 shrink-0">{item.duration}</span>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function ContentPlaybackSection({
+  expanded, onToggle, onActivate,
+  onNext, nextDisabled, nextHint,
+  layout, zonePlaybackItems, reorderZoneItems,
+}) {
+  const zones = zonesForLayout(layout);
   return (
     <SectionCard title="Content Playback" expanded={expanded} onToggle={() => { onToggle(); onActivate(); }}>
       <SubHeader
         icon={Play}
         title="Content Playback"
-        helper="Arrange the order in which your selected creatives will play during the ad slot. Drag rows to reorder."
+        helper={
+          zones.length > 1
+            ? 'Arrange the play order independently for each zone in your layout. Drag rows to reorder.'
+            : 'Arrange the order in which your selected creatives will play during the ad slot. Drag rows to reorder.'
+        }
       />
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
-        >
-          <div className="flex items-center gap-3">
-            <Monitor size={16} className="text-gray-500" />
-            <span className="text-sm font-medium text-gray-900">Dynamic Digital Display</span>
-            <span className="text-xs text-gray-400">{items.length} creatives</span>
-          </div>
-          {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
-        </button>
-
-        {open && (
-          items.length === 0 ? (
-            <div className="border-t border-gray-100 px-4 py-10 text-center">
-              <div className="text-sm text-gray-500 font-medium">No creatives selected yet.</div>
-              <div className="text-xs text-gray-400 mt-1">
-                Pick content in the section above to arrange playback order here.
-              </div>
-            </div>
-          ) : (
-            <div className="border-t border-gray-100 divide-y divide-gray-100">
-              {items.map((item, idx) => {
-                const isDragged = draggedIdx === idx;
-                const isOver = overIdx === idx && draggedIdx !== null && draggedIdx !== idx;
-                return (
-                  <div
-                    key={item.id}
-                    draggable
-                    onDragStart={(e) => onDragStart(e, idx)}
-                    onDragOver={(e) => onDragOver(e, idx)}
-                    onDrop={(e) => onDrop(e, idx)}
-                    onDragEnd={onDragEnd}
-                    className={`flex items-center gap-3 px-4 py-3 text-sm cursor-move select-none transition ${
-                      isDragged
-                        ? 'opacity-40'
-                        : isOver
-                        ? 'bg-blue-50'
-                        : 'hover:bg-gray-50'
-                    }`}
-                    style={isOver ? { boxShadow: `inset 0 2px 0 ${NAVY}` } : undefined}
-                  >
-                    <GripVertical size={14} className="text-gray-400 shrink-0" />
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-                      style={{ backgroundColor: NAVY }}
-                    >
-                      {idx + 1}
-                    </span>
-                    <span className="text-gray-900 truncate">{item.name}</span>
-                    <span className="ml-auto text-xs text-gray-400 shrink-0">{item.duration}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        )}
+      <div className="space-y-3">
+        {zones.map((z) => (
+          <ZonePlaybackRow
+            key={z.id}
+            zone={z}
+            layoutId={layout}
+            items={zonePlaybackItems[z.id] || []}
+            onReorder={(from, to) => reorderZoneItems(z.id, from, to)}
+          />
+        ))}
       </div>
       <NextButton onClick={onNext} disabled={nextDisabled} hint={nextHint} />
     </SectionCard>
@@ -1668,11 +2013,21 @@ export default function CreateSchedule() {
   const activeSlots = scheduleType === 'custom' ? customSlots : weeklySlots;
 
   // Step 2 form state
-  const [layout, setLayout] = useState('fullscreen');
+  const [layout, setLayoutRaw] = useState('fullscreen');
   const [contentSource, setContentSource] = useState('upload');
   const [selectedTemplates, setSelectedTemplates] = useState(new Set());
   const [selectedBundle, setSelectedBundle] = useState(null);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
+
+  // Per-zone uploaded files: { [zoneId]: [{ id, name, size, seed }] }
+  const [zoneFiles, setZoneFiles] = useState({});
+
+  // Per-zone playback ordering: { [zoneId]: [playback item id] }
+  // We store just the ordered list of file ids so user-driven reorders
+  // survive when other zone state mutates.
+  const [zonePlaybackOrder, setZonePlaybackOrder] = useState({});
+
+  // Pending layout switch (drives confirmation modal).
+  const [pendingLayout, setPendingLayout] = useState(null);
 
   const toggleTemplate = (id) =>
     setSelectedTemplates((s) => {
@@ -1680,23 +2035,71 @@ export default function CreateSchedule() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const removeUploadedFile = (id) =>
-    setUploadedFiles((arr) => arr.filter((f) => f.id !== id));
-  const simulateUpload = () => {
-    // Prototype: pretend to pick a file and add it to the list.
-    const id = Date.now();
-    const sampleNames = [
-      ['hero-animation.mp4', '12.4 MB'],
-      ['promo-poster.png',   '2.1 MB'],
-      ['cta-banner.jpg',     '880 KB'],
-      ['intro-loop.mp4',     '8.6 MB'],
-    ];
-    const pick = sampleNames[uploadedFiles.length % sampleNames.length];
-    setUploadedFiles((arr) => [
-      ...arr,
-      { id, name: pick[0], size: pick[1], seed: `up-${id}` },
-    ]);
+
+  // --- per-zone file actions ---
+  const SAMPLE_FILES = [
+    ['hero-animation.mp4', '12.4 MB'],
+    ['promo-poster.png',   '2.1 MB'],
+    ['cta-banner.jpg',     '880 KB'],
+    ['intro-loop.mp4',     '8.6 MB'],
+  ];
+  const addFileToZone = (zoneId) => {
+    setZoneFiles((prev) => {
+      const cur = prev[zoneId] || [];
+      const id = Date.now();
+      const pick = SAMPLE_FILES[cur.length % SAMPLE_FILES.length];
+      return {
+        ...prev,
+        [zoneId]: [...cur, { id, name: pick[0], size: pick[1], seed: `z-${zoneId}-${id}` }],
+      };
+    });
   };
+  const removeFileFromZone = (zoneId, fileId) => {
+    setZoneFiles((prev) => ({
+      ...prev,
+      [zoneId]: (prev[zoneId] || []).filter((f) => f.id !== fileId),
+    }));
+  };
+  const copyZoneContent = (fromZoneId, toZoneId) => {
+    setZoneFiles((prev) => {
+      const src = prev[fromZoneId] || [];
+      const cloned = src.map((f, i) => ({
+        ...f,
+        id: Date.now() + i,
+        seed: `z-${toZoneId}-${Date.now() + i}`,
+      }));
+      return { ...prev, [toZoneId]: cloned };
+    });
+  };
+
+  const reorderZoneItems = (zoneId, fromIdx, toIdx) => {
+    setZonePlaybackOrder((prev) => {
+      // Resolve current order. If none stored yet, fall back to file order.
+      const current = prev[zoneId] || (zoneFiles[zoneId] || []).map((f) => f.id);
+      const next = [...current];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return { ...prev, [zoneId]: next };
+    });
+  };
+
+  // Layout change with confirmation if zones already have content.
+  const setLayout = (newLayout) => {
+    if (newLayout === layout) return;
+    const hasContent = Object.values(zoneFiles).some((arr) => arr.length > 0);
+    if (hasContent) {
+      setPendingLayout(newLayout);
+    } else {
+      setLayoutRaw(newLayout);
+    }
+  };
+  const confirmLayoutChange = () => {
+    setLayoutRaw(pendingLayout);
+    setZoneFiles({});
+    setZonePlaybackOrder({});
+    setPendingLayout(null);
+  };
+  const cancelLayoutChange = () => setPendingLayout(null);
 
   // Section expanded states (main content)
   const [scheduleConfigOpen, setScheduleConfigOpen] = useState(true);
@@ -1844,38 +2247,68 @@ export default function CreateSchedule() {
     [billboards]
   );
 
-  /* -------- Playback items derived from Content Selection -------- */
+  /* -------- Playback items per zone, derived from Content Selection -------- */
 
-  const playbackItems = useMemo(() => {
+  // For each zone, build a playback list. Behavior per source:
+  //  - upload:     use the files uploaded to that specific zone
+  //  - templates:  the selected templates are shared across every zone
+  //  - previously: the selected bundle's items are shared across every zone
+  const zonePlaybackItems = useMemo(() => {
+    const zones = zonesForLayout(layout);
     const makeDuration = (i) => `${(i + 1) * 5}s`;
-    if (contentSource === 'upload') {
-      return uploadedFiles.map((f, i) => ({
-        id: `up-${f.id}`,
-        name: f.name,
-        duration: makeDuration(i),
-        seed: f.seed,
-      }));
-    }
+
+    let shared = null;
     if (contentSource === 'templates') {
-      return TEMPLATE_LIBRARY.filter((t) => selectedTemplates.has(t.id)).map((t, i) => ({
+      shared = TEMPLATE_LIBRARY.filter((t) => selectedTemplates.has(t.id)).map((t, i) => ({
         id: `tmpl-${t.id}`,
         name: t.name,
         duration: makeDuration(i),
         seed: t.seed,
       }));
-    }
-    if (contentSource === 'previously' && selectedBundle) {
+    } else if (contentSource === 'previously' && selectedBundle) {
       const bundle = PREVIOUS_BUNDLES.find((b) => b.id === selectedBundle);
-      if (!bundle) return [];
-      return (bundle.items || []).map((name, i) => ({
-        id: `bnd-${bundle.id}-${i}`,
-        name,
-        duration: makeDuration(i),
-        seed: `bnd-${bundle.id}-${i}`,
-      }));
+      if (bundle) {
+        shared = (bundle.items || []).map((name, i) => ({
+          id: `bnd-${bundle.id}-${i}`,
+          name,
+          duration: makeDuration(i),
+          seed: `bnd-${bundle.id}-${i}`,
+        }));
+      }
     }
-    return [];
-  }, [contentSource, uploadedFiles, selectedTemplates, selectedBundle]);
+
+    const out = {};
+    zones.forEach((z) => {
+      let items;
+      if (contentSource === 'upload') {
+        items = (zoneFiles[z.id] || []).map((f, i) => ({
+          id: `zf-${z.id}-${f.id}`,
+          name: f.name,
+          duration: makeDuration(i),
+          seed: f.seed,
+        }));
+      } else {
+        items = shared
+          ? shared.map((it, i) => ({
+              ...it,
+              id: `${it.id}-${z.id}`,
+              duration: makeDuration(i),
+            }))
+          : [];
+      }
+      // Honor user-driven reorder if we have one stored for this zone.
+      const order = zonePlaybackOrder[z.id];
+      if (order && order.length) {
+        const byId = Object.fromEntries(items.map((it) => [it.id, it]));
+        const reordered = order.map((id) => byId[id]).filter(Boolean);
+        const leftovers = items.filter((it) => !order.includes(it.id));
+        out[z.id] = [...reordered, ...leftovers];
+      } else {
+        out[z.id] = items;
+      }
+    });
+    return out;
+  }, [layout, contentSource, zoneFiles, selectedTemplates, selectedBundle, zonePlaybackOrder]);
 
   /* -------- Step completion -------- */
 
@@ -1896,7 +2329,10 @@ export default function CreateSchedule() {
   const step1Complete = section1ScheduleComplete && section1SlotComplete;
 
   const section2ContentComplete = (() => {
-    if (contentSource === 'upload') return uploadedFiles.length > 0;
+    const zones = zonesForLayout(layout);
+    if (contentSource === 'upload') {
+      return zones.every((z) => (zoneFiles[z.id] || []).length > 0);
+    }
     if (contentSource === 'templates') return selectedTemplates.size > 0;
     if (contentSource === 'previously') return selectedBundle != null;
     return false;
@@ -1942,9 +2378,11 @@ export default function CreateSchedule() {
         : dmy;
     };
 
-    // Snapshot the content selection so the drawer can show it later.
-    const firstItem = playbackItems[0];
-    const totalSeconds = playbackItems.reduce(
+    // Flatten all zone playback items so the drawer can pick a representative
+    // creative + compute a total duration.
+    const allItems = Object.values(zonePlaybackItems || {}).flat();
+    const firstItem = allItems[0];
+    const totalSeconds = allItems.reduce(
       (sum, p) => sum + (parseInt(p.duration, 10) || 0),
       0
     );
@@ -1954,9 +2392,11 @@ export default function CreateSchedule() {
           title: scheduleName ? `${scheduleName} — ${firstItem.name}` : firstItem.name,
           contentId: deriveContentId(firstItem.id),
           imageSeed: firstItem.seed,
-          mediaType: playbackItems.length > 1 && playbackItems.some((p) => inferMediaType(p.name) !== inferMediaType(firstItem.name))
-            ? 'Mixed'
-            : inferMediaType(firstItem.name),
+          mediaType:
+            allItems.length > 1 &&
+            allItems.some((p) => inferMediaType(p.name) !== inferMediaType(firstItem.name))
+              ? 'Mixed'
+              : inferMediaType(firstItem.name),
           duration: totalSeconds > 0 ? `${totalSeconds} seconds` : '—',
           resolution,
           lastUpdatedDate: 'May 29, 2026',
@@ -1982,12 +2422,13 @@ export default function CreateSchedule() {
     setSubmitted(true);
     const newSchedule = buildNewSchedule();
     // Brief delay so the success screen registers, then navigate.
+    // Hold the success screen for 2s before bouncing back to /dashboard.
     window.setTimeout(() => {
       navigate('/dashboard', {
         state: { newSchedule, justCreated: true },
         replace: true,
       });
-    }, 1600);
+    }, 2000);
   };
 
   const title = scheduleName.trim() || 'Untitled 1';
@@ -2007,20 +2448,22 @@ export default function CreateSchedule() {
       />
 
       <div className="flex flex-1">
-        <SummarySidebar
-          scheduleName={scheduleName}
-          brand={brand}
-          selectedScreenIds={selectedScreens}
-          scheduleType={scheduleType}
-          layout={layout}
-          contentSource={contentSource}
-          suggestedPrice={suggestedPrice}
-          activeSubsection={activeSubsection}
-          openSections={openSections}
-          toggleSection={toggleSection}
-          onJumpTo={jumpTo}
-          canGoToStep={canGoToStep}
-        />
+        {!submitted && (
+          <SummarySidebar
+            scheduleName={scheduleName}
+            brand={brand}
+            selectedScreenIds={selectedScreens}
+            scheduleType={scheduleType}
+            layout={layout}
+            contentSource={contentSource}
+            suggestedPrice={suggestedPrice}
+            activeSubsection={activeSubsection}
+            openSections={openSections}
+            toggleSection={toggleSection}
+            onJumpTo={jumpTo}
+            canGoToStep={canGoToStep}
+          />
+        )}
 
         <div className="flex-1 px-8 py-6 space-y-5" style={{ backgroundColor: SUB_BG }}>
           {step === 1 && (
@@ -2118,19 +2561,21 @@ export default function CreateSchedule() {
                 expanded={contentOpen}
                 onToggle={() => setContentOpen((v) => !v)}
                 onActivate={() => setActiveSubsection('content')}
+                layout={layout}
                 contentSource={contentSource}
                 setContentSource={setContentSource}
                 selectedTemplates={selectedTemplates}
                 toggleTemplate={toggleTemplate}
                 selectedBundle={selectedBundle}
                 setSelectedBundle={setSelectedBundle}
-                uploadedFiles={uploadedFiles}
-                removeUploadedFile={removeUploadedFile}
-                simulateUpload={simulateUpload}
+                zoneFiles={zoneFiles}
+                addFileToZone={addFileToZone}
+                removeFileFromZone={removeFileFromZone}
+                copyZoneContent={copyZoneContent}
                 nextDisabled={!section2ContentComplete}
                 nextHint={
                   contentSource === 'upload'
-                    ? 'Upload at least one file.'
+                    ? `Fill every zone — ${zonesForLayout(layout).filter((z) => (zoneFiles[z.id] || []).length === 0).length} remaining.`
                     : contentSource === 'templates'
                     ? 'Pick at least one template.'
                     : 'Pick a previously scheduled bundle.'
@@ -2145,7 +2590,9 @@ export default function CreateSchedule() {
                 expanded={playbackOpen}
                 onToggle={() => setPlaybackOpen((v) => !v)}
                 onActivate={() => setActiveSubsection('content')}
-                playbackItems={playbackItems}
+                layout={layout}
+                zonePlaybackItems={zonePlaybackItems}
+                reorderZoneItems={reorderZoneItems}
                 nextDisabled={!step2Complete}
                 nextHint={!section2ContentComplete ? 'Finish Content Selection above first.' : null}
                 onNext={() => {
@@ -2200,6 +2647,47 @@ export default function CreateSchedule() {
           )}
         </div>
       </div>
+
+      {/* Layout change confirmation modal */}
+      {pendingLayout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={cancelLayoutChange} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-[440px] p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                style={{ backgroundColor: '#FEF3C7' }}
+              >
+                <AlertCircle size={18} className="text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Change layout to {LAYOUT_LABELS[pendingLayout]}?
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Changing the layout will reset your content selections.
+                  Uploads in every zone will be cleared.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={cancelLayoutChange}
+                className="text-sm font-medium px-4 py-2 rounded-md text-gray-700 border border-gray-200 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLayoutChange}
+                className="text-sm font-medium px-4 py-2 rounded-md text-white hover:opacity-90"
+                style={{ backgroundColor: NAVY }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2219,6 +2707,10 @@ export {
   BRAND_OPTIONS,
   WEEK_DAYS,
   DAY_FULL,
+  LAYOUT_ZONES,
+  LAYOUT_LABELS,
+  zonesForLayout,
+  LayoutDiagram,
   TEMPLATE_LIBRARY,
   PREVIOUS_BUNDLES,
   parseDateDMY,
@@ -2226,6 +2718,9 @@ export {
   inferMediaType,
   deriveContentId,
   bundleItemCount,
+  // Screen picker pieces
+  BillboardThumbnail,
+  ScreenSelector,
   SectionCard,
   SubHeader,
   Label,

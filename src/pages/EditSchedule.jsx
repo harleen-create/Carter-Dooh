@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   X,
   AlertTriangle,
-  Search,
-  Trash2,
   ClipboardList,
 } from 'lucide-react';
 import {
@@ -13,6 +11,8 @@ import {
   SUB_BG,
   SCREEN_LIBRARY,
   BRAND_OPTIONS,
+  LAYOUT_LABELS,
+  zonesForLayout,
   parseDateDMY,
   parseTime,
   PageHeader,
@@ -24,6 +24,7 @@ import {
   SelectInput,
   NextButton,
   SummarySidebar,
+  ScreenSelector,
   SlotConfigSection,
   LayoutSelectionSection,
   ContentSelectionSection,
@@ -88,19 +89,7 @@ function EditScheduleConfigSection({
   selectedScreens, toggleScreen, removeScreen,
   onNext,
 }) {
-  const [search, setSearch] = useState('');
   const [draftBrand, setDraftBrand] = useState('');
-
-  const filtered = SCREEN_LIBRARY.filter((s) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      s.name.toLowerCase().includes(q) ||
-      s.id.includes(q) ||
-      s.location.toLowerCase().includes(q)
-    );
-  });
-
   const availableBrands = BRAND_OPTIONS.filter((b) => !brands.includes(b));
 
   const handleAddBrand = (b) => {
@@ -163,121 +152,11 @@ function EditScheduleConfigSection({
 
       <Label required info>Select Screen</Label>
 
-      <div className="grid grid-cols-2 gap-4 mt-2">
-        {/* Library */}
-        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col">
-          <div
-            className="px-4 py-2.5 text-xs font-medium text-gray-600"
-            style={{ backgroundColor: SUB_BG }}
-          >
-            Total Screen: 45
-          </div>
-          <div className="p-3 border-b border-gray-100">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search billboards by name, ID or Location"
-                className="w-full text-xs bg-white border border-gray-200 rounded-md pl-9 pr-3 py-2 outline-none focus:border-gray-400"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-[24px_1fr_90px_90px] gap-3 px-4 py-2 text-[11px] font-medium text-gray-500 border-b border-gray-100">
-            <span></span>
-            <span>Screen</span>
-            <span>Location</span>
-            <span>Price</span>
-          </div>
-          <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
-            {filtered.map((s) => {
-              const checked = selectedScreens.has(s.id);
-              return (
-                <label
-                  key={s.id}
-                  className={`grid grid-cols-[24px_1fr_90px_90px] gap-3 items-center px-4 py-3 cursor-pointer ${
-                    checked ? 'bg-blue-50/60' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleScreen(s.id)}
-                  />
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={`https://picsum.photos/seed/${s.seed}/120/120`}
-                      alt={s.name}
-                      className="w-12 h-12 rounded-md object-cover bg-gray-100 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-[11px] text-[#12297D] font-medium">
-                        Screen ID: {s.id}
-                      </div>
-                      <div className="text-sm font-semibold text-gray-900 truncate">
-                        {s.name}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-700">{s.location}</div>
-                  <div className="text-xs font-semibold text-gray-900">$ {s.price}/day</div>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Selected */}
-        <div
-          className="border border-gray-200 rounded-lg overflow-hidden flex flex-col"
-          style={{ backgroundColor: SUB_BG }}
-        >
-          <div className="px-4 py-2.5 text-xs font-medium text-gray-600 bg-white border-b border-gray-100">
-            Selected Screen: {selectedScreens.size}
-          </div>
-          {selectedScreens.size === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-              <div className="text-sm text-gray-400 font-medium">No screens selected yet.</div>
-              <div className="text-xs text-gray-400 mt-1">
-                Pick screens from the list to add them here.
-              </div>
-            </div>
-          ) : (
-            <div className="p-3 space-y-2 overflow-y-auto max-h-96">
-              {SCREEN_LIBRARY.filter((s) => selectedScreens.has(s.id)).map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-3 bg-white border border-gray-200 rounded-md px-3 py-2.5"
-                >
-                  <img
-                    src={`https://picsum.photos/seed/${s.seed}/120/120`}
-                    alt={s.name}
-                    className="w-12 h-12 rounded-md object-cover bg-gray-100 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] text-[#12297D] font-medium">
-                      Screen ID: {s.id}
-                    </div>
-                    <div className="text-sm font-semibold text-gray-900 truncate">
-                      {s.name}
-                    </div>
-                  </div>
-                  <div className="text-xs font-semibold text-gray-900 shrink-0">
-                    $ {s.price}/day
-                  </div>
-                  <button
-                    onClick={() => removeScreen(s.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <ScreenSelector
+        selectedScreens={selectedScreens}
+        toggleScreen={toggleScreen}
+        removeScreen={removeScreen}
+      />
 
       <NextButton onClick={onNext} />
     </SectionCard>
@@ -319,15 +198,20 @@ export default function EditSchedule() {
   ]);
   const activeSlots = scheduleType === 'custom' ? customSlots : weeklySlots;
 
-  const [layout, setLayout] = useState('quadrant');
+  const [layout, setLayoutRaw] = useState('quadrant');
   const [contentSource, setContentSource] = useState('upload');
   const [selectedTemplates, setSelectedTemplates] = useState(new Set());
   const [selectedBundle, setSelectedBundle] = useState(null);
-  const [uploadedFiles, setUploadedFiles] = useState([
-    { id: 1, name: 'Hero animation.mp4',  size: '12.4 MB', seed: 'edit-hero' },
-    { id: 2, name: 'Discount overlay.png', size: '2.1 MB',  seed: 'edit-overlay' },
-    { id: 3, name: 'Call to action.jpg',  size: '880 KB',  seed: 'edit-cta' },
-  ]);
+  // Pre-populated per-zone files so the Quadrant layout has all four zones
+  // filled with sample creatives.
+  const [zoneFiles, setZoneFiles] = useState({
+    q1: [{ id: 11, name: 'Hero animation.mp4',  size: '12.4 MB', seed: 'edit-q1-hero' }],
+    q2: [{ id: 12, name: 'Discount overlay.png', size: '2.1 MB',  seed: 'edit-q2-overlay' }],
+    q3: [{ id: 13, name: 'Call to action.jpg',  size: '880 KB',  seed: 'edit-q3-cta' }],
+    q4: [{ id: 14, name: 'Endcard loop.mp4',    size: '5.2 MB',  seed: 'edit-q4-endcard' }],
+  });
+  const [zonePlaybackOrder, setZonePlaybackOrder] = useState({});
+  const [pendingLayout, setPendingLayout] = useState(null);
 
   /* -------- Section open states -------- */
   const [scheduleConfigOpen, setScheduleConfigOpen] = useState(true);
@@ -403,21 +287,65 @@ export default function EditSchedule() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const removeUploadedFile = (id) =>
-    setUploadedFiles((arr) => arr.filter((f) => f.id !== id));
-  const simulateUpload = () => {
-    const id = Date.now();
-    const samples = [
-      ['extra-promo.mp4', '6.2 MB'],
-      ['banner-cta.png',  '1.4 MB'],
-      ['intro-loop.mp4',  '8.6 MB'],
-    ];
-    const pick = samples[uploadedFiles.length % samples.length];
-    setUploadedFiles((arr) => [
-      ...arr,
-      { id, name: pick[0], size: pick[1], seed: `up-${id}` },
-    ]);
+
+  // Per-zone file handlers
+  const ED_SAMPLE_FILES = [
+    ['extra-promo.mp4', '6.2 MB'],
+    ['banner-cta.png',  '1.4 MB'],
+    ['intro-loop.mp4',  '8.6 MB'],
+  ];
+  const addFileToZone = (zoneId) => {
+    setZoneFiles((prev) => {
+      const cur = prev[zoneId] || [];
+      const id = Date.now();
+      const pick = ED_SAMPLE_FILES[cur.length % ED_SAMPLE_FILES.length];
+      return {
+        ...prev,
+        [zoneId]: [...cur, { id, name: pick[0], size: pick[1], seed: `ez-${zoneId}-${id}` }],
+      };
+    });
   };
+  const removeFileFromZone = (zoneId, fileId) => {
+    setZoneFiles((prev) => ({
+      ...prev,
+      [zoneId]: (prev[zoneId] || []).filter((f) => f.id !== fileId),
+    }));
+  };
+  const copyZoneContent = (fromZoneId, toZoneId) => {
+    setZoneFiles((prev) => {
+      const src = prev[fromZoneId] || [];
+      const cloned = src.map((f, i) => ({
+        ...f,
+        id: Date.now() + i,
+        seed: `ez-${toZoneId}-${Date.now() + i}`,
+      }));
+      return { ...prev, [toZoneId]: cloned };
+    });
+  };
+  const reorderZoneItems = (zoneId, fromIdx, toIdx) => {
+    setZonePlaybackOrder((prev) => {
+      const current = prev[zoneId] || (zoneFiles[zoneId] || []).map((f) => f.id);
+      const next = [...current];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return { ...prev, [zoneId]: next };
+    });
+  };
+
+  // Layout change with confirmation
+  const setLayout = (newLayout) => {
+    if (newLayout === layout) return;
+    const hasContent = Object.values(zoneFiles).some((arr) => arr.length > 0);
+    if (hasContent) setPendingLayout(newLayout);
+    else setLayoutRaw(newLayout);
+  };
+  const confirmLayoutChange = () => {
+    setLayoutRaw(pendingLayout);
+    setZoneFiles({});
+    setZonePlaybackOrder({});
+    setPendingLayout(null);
+  };
+  const cancelLayoutChange = () => setPendingLayout(null);
 
   /* -------- Validation (mirrors CreateSchedule, lighter touch) -------- */
   const parsedStart = useMemo(() => parseDateDMY(startDate), [startDate]);
@@ -503,19 +431,35 @@ export default function EditSchedule() {
     if (subsection === 'billboard') setBillboardOpen(true);
   };
 
-  /* -------- Playback items derived from Content Selection -------- */
-  const playbackItems = useMemo(() => {
+  /* -------- Per-zone playback items derived from Content Selection -------- */
+  const zonePlaybackItems = useMemo(() => {
+    const zones = zonesForLayout(layout);
     const makeDuration = (i) => `${(i + 1) * 5}s`;
-    if (contentSource === 'upload') {
-      return uploadedFiles.map((f, i) => ({
-        id: `up-${f.id}`,
-        name: f.name,
-        duration: makeDuration(i),
-        seed: f.seed,
-      }));
-    }
-    return [];
-  }, [contentSource, uploadedFiles]);
+    const out = {};
+    zones.forEach((z) => {
+      let items;
+      if (contentSource === 'upload') {
+        items = (zoneFiles[z.id] || []).map((f, i) => ({
+          id: `zf-${z.id}-${f.id}`,
+          name: f.name,
+          duration: makeDuration(i),
+          seed: f.seed,
+        }));
+      } else {
+        items = [];
+      }
+      const order = zonePlaybackOrder[z.id];
+      if (order && order.length) {
+        const byId = Object.fromEntries(items.map((it) => [it.id, it]));
+        const reordered = order.map((id) => byId[id]).filter(Boolean);
+        const leftovers = items.filter((it) => !order.includes(it.id));
+        out[z.id] = [...reordered, ...leftovers];
+      } else {
+        out[z.id] = items;
+      }
+    });
+    return out;
+  }, [layout, contentSource, zoneFiles, zonePlaybackOrder]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -623,15 +567,17 @@ export default function EditSchedule() {
                 expanded={contentOpen}
                 onToggle={() => setContentOpen((v) => !v)}
                 onActivate={() => setActiveSubsection('content')}
+                layout={layout}
                 contentSource={contentSource}
                 setContentSource={setContentSource}
                 selectedTemplates={selectedTemplates}
                 toggleTemplate={toggleTemplate}
                 selectedBundle={selectedBundle}
                 setSelectedBundle={setSelectedBundle}
-                uploadedFiles={uploadedFiles}
-                removeUploadedFile={removeUploadedFile}
-                simulateUpload={simulateUpload}
+                zoneFiles={zoneFiles}
+                addFileToZone={addFileToZone}
+                removeFileFromZone={removeFileFromZone}
+                copyZoneContent={copyZoneContent}
                 nextDisabled={false}
                 onNext={() => {
                   setContentOpen(false);
@@ -643,7 +589,9 @@ export default function EditSchedule() {
                 expanded={playbackOpen}
                 onToggle={() => setPlaybackOpen((v) => !v)}
                 onActivate={() => setActiveSubsection('content')}
-                playbackItems={playbackItems}
+                layout={layout}
+                zonePlaybackItems={zonePlaybackItems}
+                reorderZoneItems={reorderZoneItems}
                 nextDisabled={false}
                 onNext={() => {
                   setStep(3);
@@ -684,6 +632,47 @@ export default function EditSchedule() {
         onCancel={() => setDiscardOpen(false)}
         onConfirm={() => navigate('/dashboard')}
       />
+
+      {/* Layout change confirmation */}
+      {pendingLayout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={cancelLayoutChange} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-[440px] p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                style={{ backgroundColor: '#FEF3C7' }}
+              >
+                <AlertTriangle size={18} className="text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Change layout to {LAYOUT_LABELS[pendingLayout]}?
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Changing the layout will reset your content selections. Uploads
+                  in every zone will be cleared.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={cancelLayoutChange}
+                className="text-sm font-medium px-4 py-2 rounded-md text-gray-700 border border-gray-200 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLayoutChange}
+                className="text-sm font-medium px-4 py-2 rounded-md text-white hover:opacity-90"
+                style={{ backgroundColor: NAVY }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

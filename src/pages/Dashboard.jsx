@@ -1116,6 +1116,32 @@ export default function Dashboard() {
     { id: 's8', name: 'Independence Day Burst',         brand: 'Advertiser Specific', owner: 'Ruth Price', type: 'Recurring',   status: 'Archived', startDate: 'Aug 10, 2024', startTime: '09:00', endDate: 'Aug 16, 2024', endTime: '23:59', archivedAt: 'May 02, 2026 | 18:15' },
   ]);
 
+  /* -------- Weekly calendar data ----------
+   * Now stateful so newly created schedules from /create-schedule can be
+   * appended to the right day of the week.
+   */
+  const [calendarSchedules, setCalendarSchedules] = useState({
+    Monday: [
+      { name: 'Nike x SNKRS Drop Launch', brand: 'Nike, India', status: 'Active', dateRange: '16 Jun - 19 Jun' },
+      { name: 'Apple Watch Series X Promo', brand: 'Nike, India', status: 'Active', dateRange: '16 May - 19 May' },
+    ],
+    Tuesday: [],
+    Wednesday: [
+      { name: 'Netflix Stranger Things 5', brand: 'Nike, India', status: 'Active', dateRange: '24 May - 26 May' },
+    ],
+    Thursday: [
+      { name: 'Samsung Fold Reveal', brand: 'Nike, India', status: 'Active', dateRange: '20 May - 22 May' },
+    ],
+    Friday: [],
+    Saturday: [
+      { name: 'Summer Campaign', brand: 'Nike, India', status: 'Active', dateRange: '28 May - 30 May' },
+      { name: "McDonald's Breakfast Rush", brand: 'Nike, India', status: 'Active', dateRange: '16 May - 19 May' },
+    ],
+    Sunday: [
+      { name: 'CRED Cashback Weekender', brand: 'Nike, India', status: 'Active', dateRange: '16 May - 19 May' },
+    ],
+  });
+
   /* -------- New schedule arrival from /create-schedule -------- */
   useEffect(() => {
     const ns = location.state?.newSchedule;
@@ -1126,6 +1152,44 @@ export default function Dashboard() {
     });
     setFlashedIds(new Set([ns.id]));
     showToast(`"${ns.name}" created successfully.`);
+
+    // Also drop the new schedule into the Upcoming Schedules weekly calendar
+    // on the day-of-week of its start date.
+    const fmtDay = (d) => d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+    const startParsed = ns.startDate === 'Today' ? new Date() : new Date(ns.startDate);
+    const endParsed = ns.endDate ? new Date(ns.endDate) : null;
+    const dayName = !Number.isNaN(startParsed.getTime())
+      ? startParsed.toLocaleDateString('en-US', { weekday: 'long' })
+      : null;
+    if (dayName) {
+      const dateRange =
+        endParsed && !Number.isNaN(endParsed.getTime())
+          ? `${fmtDay(startParsed)} - ${fmtDay(endParsed)}`
+          : fmtDay(startParsed);
+      setCalendarSchedules((prev) => {
+        // Dedup: if a card with this scheduleId already lives in any day,
+        // skip. Guards against React strict-mode double-effect + same-schedule
+        // revisits.
+        const alreadyPresent = Object.values(prev).some((arr) =>
+          arr.some((c) => c.scheduleId === ns.id)
+        );
+        if (alreadyPresent) return prev;
+        return {
+          ...prev,
+          [dayName]: [
+            {
+              name: ns.name,
+              brand: ns.brand,
+              status: ns.status === 'Archived' ? 'Archived' : 'Active',
+              dateRange,
+              scheduleId: ns.id,
+            },
+            ...(prev[dayName] || []),
+          ],
+        };
+      });
+    }
+
     // Clear router state so a refresh doesn't re-add the row.
     window.history.replaceState({}, document.title);
     const t = window.setTimeout(() => setFlashedIds(new Set()), 4000);
@@ -1217,6 +1281,20 @@ export default function Dashboard() {
     else setSelectedIds(new Set(visibleSchedules.map((s) => s.id)));
   };
 
+  // Remove any matching calendar cards (used by archive + future delete flows).
+  const dropFromCalendar = (idSet) => {
+    setCalendarSchedules((prev) => {
+      const next = {};
+      let changed = false;
+      Object.entries(prev).forEach(([day, cards]) => {
+        const filtered = cards.filter((c) => !idSet.has(c.scheduleId));
+        if (filtered.length !== cards.length) changed = true;
+        next[day] = filtered;
+      });
+      return changed ? next : prev;
+    });
+  };
+
   const archiveSchedule = (sch) => {
     const stamp = 'May 29, 2026 | 14:00';
     setSchedules((prev) =>
@@ -1232,6 +1310,9 @@ export default function Dashboard() {
           : s
       )
     );
+    // Drop the archived schedule from the Upcoming Schedules calendar — it
+    // shouldn't appear as "upcoming" once archived.
+    dropFromCalendar(new Set([sch.id]));
     setSelectedIds((s) => {
       const next = new Set(s);
       next.delete(sch.id);
@@ -1261,31 +1342,12 @@ export default function Dashboard() {
           : s
       )
     );
+    // Sync the Upcoming Schedules calendar.
+    dropFromCalendar(new Set(selectedIds));
     setSelectedIds(new Set());
     showToast(`${count} schedule${count > 1 ? 's' : ''} moved to Archived Schedules.`);
   };
 
-  const calendarSchedules = {
-    Monday: [
-      { name: 'Nike x SNKRS Drop Launch', brand: 'Nike, India', status: 'Active', dateRange: '16 Jun - 19 Jun' },
-      { name: 'Apple Watch Series X Promo', brand: 'Nike, India', status: 'Active', dateRange: '16 May - 19 May' },
-    ],
-    Tuesday: [],
-    Wednesday: [
-      { name: 'Netflix Stranger Things 5', brand: 'Nike, India', status: 'Active', dateRange: '24 May - 26 May' },
-    ],
-    Thursday: [
-      { name: 'Samsung Fold Reveal', brand: 'Nike, India', status: 'Active', dateRange: '20 May - 22 May' },
-    ],
-    Friday: [],
-    Saturday: [
-      { name: 'Summer Campaign', brand: 'Nike, India', status: 'Active', dateRange: '28 May - 30 May' },
-      { name: "McDonald's Breakfast Rush", brand: 'Nike, India', status: 'Active', dateRange: '16 May - 19 May' },
-    ],
-    Sunday: [
-      { name: 'CRED Cashback Weekender', brand: 'Nike, India', status: 'Active', dateRange: '16 May - 19 May' },
-    ],
-  };
 
   const isArchivedTab = tab === 'archived';
 
